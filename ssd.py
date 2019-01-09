@@ -114,6 +114,9 @@ class SSD(nn.Module):
         other, ext = os.path.splitext(base_file)
         if ext == '.pkl' or '.pth':
             print('Loading weights into state dict...')
+            print(base_file)
+            base_file = base_file.strip()
+            self.vgg.load_state_dict(torch.load('/home/avisek/kv/ssd.pytorch/weights/vgg16_reducedfc.pth'))
             self.load_state_dict(torch.load(base_file,
                                  map_location=lambda storage, loc: storage))
             print('Finished!')

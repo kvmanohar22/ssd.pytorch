@@ -95,7 +95,7 @@ class VOCDetection(data.Dataset):
     """
 
     def __init__(self, root,
-                 image_sets=[('2007', 'trainval'), ('2012', 'trainval')],
+                 image_sets=[('2012', 'train')],
                  transform=None, target_transform=VOCAnnotationTransform(),
                  dataset_name='VOC0712'):
         self.root = root
@@ -110,6 +110,9 @@ class VOCDetection(data.Dataset):
             rootpath = osp.join(self.root, 'VOC' + year)
             for line in open(osp.join(rootpath, 'ImageSets', 'Main', name + '.txt')):
                 self.ids.append((rootpath, line.strip()))
+        # self.ids = self.ids[:int(0.55*len(self.ids))]
+        # self.ids = self.ids[:int(0.01*len(self.ids))]
+        print('Training on {} training images '.format(len(self.ids)))
 
     def __getitem__(self, index):
         im, gt, h, w = self.pull_item(index)
@@ -136,7 +139,7 @@ class VOCDetection(data.Dataset):
             img = img[:, :, (2, 1, 0)]
             # img = img.transpose(2, 0, 1)
             target = np.hstack((boxes, np.expand_dims(labels, axis=1)))
-        return torch.from_numpy(img).permute(2, 0, 1), target, height, width
+        return img_id[1], torch.from_numpy(img).permute(2, 0, 1), target, height, width
         # return torch.from_numpy(img), target, height, width
 
     def pull_image(self, index):

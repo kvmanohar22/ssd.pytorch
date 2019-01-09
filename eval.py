@@ -29,6 +29,30 @@ else:
     import xml.etree.ElementTree as ET
 
 
+labeldict = {
+    'aeroplane': 0,
+    'bicycle': 1,
+    'bird': 2,
+    'boat': 3,
+    'bottle': 4,
+    'bus': 5,
+    'car': 6,
+    'cat': 7,
+    'chair': 8,
+    'cow': 9,
+    'diningtable': 10,
+    'dog': 11,
+    'horse': 12,
+    'motorbike': 13,
+    'person': 14,
+    'pottedplant': 15,
+    'sheep': 16,
+    'sofa': 17,
+    'train': 19,
+    'tvmonitor': 20
+}
+
+
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
 
@@ -70,11 +94,11 @@ annopath = os.path.join(args.voc_root, 'VOC2007', 'Annotations', '%s.xml')
 imgpath = os.path.join(args.voc_root, 'VOC2007', 'JPEGImages', '%s.jpg')
 imgsetpath = os.path.join(args.voc_root, 'VOC2007', 'ImageSets',
                           'Main', '{:s}.txt')
+
 YEAR = '2007'
 devkit_path = args.voc_root + 'VOC' + YEAR
 dataset_mean = (104, 117, 123)
 set_type = 'test'
-
 
 class Timer(object):
     """A simple timer."""
@@ -369,14 +393,49 @@ def test_net(save_folder, net, cuda, dataset, transform, top_k,
     #    (x1, y1, x2, y2, score)
     all_boxes = [[[] for _ in range(num_images)]
                  for _ in range(len(labelmap)+1)]
+    gts_boxes = [[] for _ in range(num_images)]
+
+    cachedir = os.path.join(devkit_path, 'annotations_cache')
+    cachefile = os.path.join(cachedir, 'annots.pkl')
+    imagesetfile = imgsetpath.format(set_type)
+    with open(imagesetfile, 'r') as f:
+        lines = f.readlines()
+    imagenames = [x.strip() for x in lines]
+
+    if not os.path.isfile(cachefile):
+        # load annots
+        recs = {}
+        for i, imagename in enumerate(imagenames):
+            recs[imagename] = parse_rec(annopath % (imagename))
+            if i % 100 == 0:
+                print('Reading annotation for {:d}/{:d}'.format(
+                   i + 1, len(imagenames)))
+        # save
+        print('Saving cached annotations to {:s}'.format(cachefile))
+        with open(cachefile, 'wb') as f:
+            pickle.dump(recs, f)
+    else:
+        # load
+        with open(cachefile, 'rb') as f:
+            recs = pickle.load(f)
 
     # timers
     _t = {'im_detect': Timer(), 'misc': Timer()}
     output_dir = get_output_dir('ssd300_120000', set_type)
     det_file = os.path.join(output_dir, 'detections.pkl')
+    gtt_file = os.path.join(output_dir, 'groundtruth.pkl')
 
     for i in range(num_images):
-        im, gt, h, w = dataset.pull_item(i)
+
+        print('Generating results for img idx: {:3d}/{:3d}'.format(i, num_images))
+        img_id, im, gt, h, w = dataset.pull_item(i+23)
+
+        # Extract the ground truth data
+        R = [obj for obj in recs[str(img_id)]]
+        bbox = np.array([x['bbox'] for x in R])
+        clss = np.array([labeldict[x['name']] for x in R])
+
+        gts_boxes[i] = [bbox, clss]
 
         x = Variable(im.unsqueeze(0))
         if args.cuda:
@@ -408,11 +467,12 @@ def test_net(save_folder, net, cuda, dataset, transform, top_k,
 
     with open(det_file, 'wb') as f:
         pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
+    with open(gtt_file, 'wb') as f:
+        pickle.dump(gts_boxes, f, pickle.HIGHEST_PROTOCOL)
 
     print('Evaluating detections')
     evaluate_detections(all_boxes, output_dir, dataset)
-
-
+   
 def evaluate_detections(box_list, output_dir, dataset):
     write_voc_results_file(box_list, dataset)
     do_python_eval(output_dir)
@@ -426,7 +486,7 @@ if __name__ == '__main__':
     net.eval()
     print('Finished loading model!')
     # load data
-    dataset = VOCDetection(args.voc_root, [('2007', set_type)],
+    dataset = VOCDetection(args.voc_root, [(YEAR, set_type)],
                            BaseTransform(300, dataset_mean),
                            VOCAnnotationTransform())
     if args.cuda:
