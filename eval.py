@@ -428,7 +428,7 @@ def test_net(save_folder, net, cuda, dataset, transform, top_k,
     for i in range(num_images):
 
         print('Generating results for img idx: {:3d}/{:3d}'.format(i, num_images))
-        img_id, im, gt, h, w = dataset.pull_item(i+23)
+        img_id, im, gt, h, w = dataset.pull_item(i)
 
         # Extract the ground truth data
         R = [obj for obj in recs[str(img_id)]]
@@ -449,7 +449,7 @@ def test_net(save_folder, net, cuda, dataset, transform, top_k,
             dets = detections[0, j, :]
             mask = dets[:, 0].gt(0.).expand(5, dets.size(0)).t()
             dets = torch.masked_select(dets, mask).view(-1, 5)
-            if dets.dim() == 0:
+            if dets.size() == torch.Size([0]):
                 continue
             boxes = dets[:, 1:]
             boxes[:, 0] *= w
