@@ -145,13 +145,13 @@ def parse_rec(filename):
     return objects
 
 
-def get_output_dir(name, phase):
+def get_output_dir(base, name, phase):
     """Return the directory where experimental artifacts are placed.
     If the directory does not exist, it is created.
     A canonical path is built using the name from an imdb and a network
     (if not None).
     """
-    filedir = os.path.join(name, phase)
+    filedir = os.path.join(base, name, phase)
     if not os.path.exists(filedir):
         os.makedirs(filedir)
     return filedir
@@ -421,9 +421,13 @@ def test_net(save_folder, net, cuda, dataset, transform, top_k,
 
     # timers
     _t = {'im_detect': Timer(), 'misc': Timer()}
-    output_dir = get_output_dir('ssd300_120000', set_type)
-    det_file = os.path.join(output_dir, 'detections.pkl')
-    gtt_file = os.path.join(output_dir, 'groundtruth.pkl')
+    output_dir = get_output_dir('results', args.trained_model.split('/')[-1], set_type)
+
+    if not os.path.exists(os.path.join(output_dir, '../overall')):
+        os.mkdir(os.path.join(output_dir, '../overall'))
+
+    det_file = os.path.join(output_dir, '../overall', 'detections.pkl')
+    gtt_file = os.path.join(output_dir, '../overall', 'groundtruth.pkl')
 
     for i in range(num_images):
 
@@ -474,7 +478,7 @@ def test_net(save_folder, net, cuda, dataset, transform, top_k,
     evaluate_detections(all_boxes, output_dir, dataset)
    
 def evaluate_detections(box_list, output_dir, dataset):
-    write_voc_results_file(box_list, dataset)
+    # write_voc_results_file(box_list, dataset)
     do_python_eval(output_dir)
 
 
